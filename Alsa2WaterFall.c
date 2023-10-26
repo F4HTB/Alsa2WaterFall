@@ -401,15 +401,17 @@ void draw_time(time_t now,size_t linestart)
 	for(int z=0;z<5;z++){
 		int line = linestart;
 		for(int i=0;i<8;i++){
-			if(line>watterfall.height)line=0;
+			if(line>=watterfall.height)line=0;
 			int actu_pixel_index = line * watterfall.width + z * 10;
 			for(int j=0;j<10;j++){
 				if(numbers[time[z]][j] & (1 << i)){
 					watterfall.pixels[actu_pixel_index].green = 255;
 				}
+				else{watterfall.pixels[actu_pixel_index].green = 0;}
 				if(numbers[time[z]][j+10] & (1 << i)){
 					watterfall.pixels[actu_pixel_index+(8 * watterfall.width)].green = 255;
 				}
+				else{watterfall.pixels[actu_pixel_index+(8 * watterfall.width)].green = 0;}
 				actu_pixel_index++;
 			}
 			line++;
