@@ -507,6 +507,8 @@ int main (int argc, char *argv[])
 	int hour,min,sec,last_maker_time;
 	
 	while (keepRunning) { 
+	
+		bool CURRENTLINE_SET=1;
 		for (int a = 0; a < fftw.AVG; a++)
 		{
 			audioRead();
@@ -520,16 +522,33 @@ int main (int argc, char *argv[])
 			}
 			fftw_execute(fftw.PLAN);
 			
-			for (int p = 0; p < fftw.OUTLENGHT; p++)
-			{
-				int i = 0;
-				if(p<(fftw.OUTLENGHT/2)) {i=(fftw.OUTLENGHT/2)-p;}
-				else{i=(fftw.OUTLENGHT)-(p-(fftw.OUTLENGHT/2));}
-				double val = sqrt(fftw.OUT[i][_Q_] * fftw.OUT[i][_Q_] + fftw.OUT[i][_I_] * fftw.OUT[i][_I_])/0.006125;
-				val = val > 1.0 ? 1.0 : val;
-				fftw.CURRENTLINE[p] += val;
-				fftw.CURRENTLINE[p] /=2;
+			if(CURRENTLINE_SET){
+				for (int p = 0; p < fftw.OUTLENGHT; p++)
+				{
+					int i = 0;
+					if(p<(fftw.OUTLENGHT/2)) {i=(fftw.OUTLENGHT/2)-p;}
+					else{i=(fftw.OUTLENGHT)-(p-(fftw.OUTLENGHT/2));}
+					double val = sqrt(fftw.OUT[i][_Q_] * fftw.OUT[i][_Q_] + fftw.OUT[i][_I_] * fftw.OUT[i][_I_])/0.006125;
+					val = val > 1.0 ? 1.0 : val;
+					fftw.CURRENTLINE[p] = val;
+				}
 			}
+			else
+			{
+				for (int p = 0; p < fftw.OUTLENGHT; p++)
+				{
+					int i = 0;
+					if(p<(fftw.OUTLENGHT/2)) {i=(fftw.OUTLENGHT/2)-p;}
+					else{i=(fftw.OUTLENGHT)-(p-(fftw.OUTLENGHT/2));}
+					double val = sqrt(fftw.OUT[i][_Q_] * fftw.OUT[i][_Q_] + fftw.OUT[i][_I_] * fftw.OUT[i][_I_])/0.006125;
+					val = val > 1.0 ? 1.0 : val;
+					fftw.CURRENTLINE[p] += val;
+					fftw.CURRENTLINE[p] /=2;
+				}
+			}
+			
+			CURRENTLINE_SET=0;
+			
 			if(!keepRunning)break;
 			usleep((fftw.INTERVAL*1000000)/fftw.AVG);
 		}
