@@ -3,7 +3,7 @@ CC = g++
 EXECUTABLE = Alsa2WaterFall
 
 CFLAGS += -Wall -Wextra -march=native
-LDLIBS += -lm -lasound -lfftw3 -lfftw3_threads -lpng
+LDLIBS += -lm -lasound -lfftw3 -lfftw3_threads -lpng -pthread
 
 INSTALL=install
 INSTALL_PROGRAM=$(INSTALL)

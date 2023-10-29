@@ -18,6 +18,7 @@
 #include <math.h>
 
 #include <time.h>
+#include <pthread.h>
 
 bool VERBOSE = 0;
 
@@ -27,7 +28,7 @@ struct soundInfo
 {
 	
 	char *BUFFER;
-	char *DEVICE = "default";
+	char *DEVICE = (char*)"default";
 	unsigned int RATE = 48000;
 	int  SAMPLES_PER_TURN = 4096;
 	int  CHANEL = 2;
@@ -167,7 +168,8 @@ struct fftwInfo
 	int INTERVAL = 1;
 	int AVG = 1;
 	int WRITE_OUTPUT_INTERVAL = 10;
-	char *OUTPUT_FILE = "output.png";
+	char *OUTPUT_FILE = (char*)"output.png";
+	char *OUTPUT_FILE_TMP = (char*)"output.png.tmp";
 	
 	int OUTLENGHT;
 	fftw_complex *IN;
@@ -283,7 +285,7 @@ static pixel_t * pixel_at (bitmap_t * bitmap, int x, int y)
     return bitmap->pixels + bitmap->width * y + x;
 }
 
-static int save_png_to_file (bitmap_t *bitmap, const char *path, int offset_y = 0)
+static int save_watterfall_to_file (bitmap_t *bitmap, const char *path, int offset_y = 0)
 {
     FILE * fp;
     png_structp png_ptr = NULL;
@@ -398,11 +400,34 @@ void draw_time(time_t now,size_t linestart)
 	time[3]=now_tm->tm_min/10;
 	time[4]=now_tm->tm_min-(time[3]*10);
 	
+	int actu_pixel_index = (linestart * watterfall.width);
+	for (int p = 0; p < watterfall.TEXT_OFFSET; p++)
+	{
+		watterfall.pixels[actu_pixel_index].red = 0;
+		watterfall.pixels[actu_pixel_index].green = 255;
+		watterfall.pixels[actu_pixel_index].blue = 0;
+		actu_pixel_index++;				
+	}
+	
+	int nline_to_delete = (watterfall.TIMER_MARKER_INTERVAL * 60) / fftw.INTERVAL;
+	
+	for (int x = 1; x < nline_to_delete; x++){
+		actu_pixel_index = ((linestart + x) * watterfall.width);
+		for (int p = 0; p < watterfall.TEXT_OFFSET; p++)
+		{
+			watterfall.pixels[actu_pixel_index].red = 0;
+			watterfall.pixels[actu_pixel_index].green = 0;
+			watterfall.pixels[actu_pixel_index].blue = 0;
+			actu_pixel_index++;				
+		}
+	}
+	
+	
 	for(int z=0;z<5;z++){
-		int line = linestart;
+		int line = linestart + 2;
 		for(int i=0;i<8;i++){
-			if(line>=watterfall.height)line=0;
-			int actu_pixel_index = line * watterfall.width + z * 10;
+			if(line>=(int)watterfall.height)line=0;
+			actu_pixel_index = line * watterfall.width + z * 10;
 			for(int j=0;j<10;j++){
 				if(numbers[time[z]][j] & (1 << i)){
 					watterfall.pixels[actu_pixel_index].green = 255;
@@ -420,19 +445,52 @@ void draw_time(time_t now,size_t linestart)
 	}
 }
 
-
 /*End bitmap*/
 
-/*sig*/
+/*Other*/
 static volatile int keepRunning = 1;
-void intHandler(int dummy) {
+void CtrlCHandler(int dummy __attribute__((unused))) {
     keepRunning = 0;
 }
-/*End sig*/
-	      
+
+#define USLEEP_MAX (1000000 - 1)
+void long_sleep(unsigned long micros)
+{
+  while(micros > 0)
+  {
+    const unsigned long chunk = micros > USLEEP_MAX ? USLEEP_MAX : micros;
+    usleep(chunk);
+    micros -= chunk;
+  }
+}
+char* my_strcat(const char* const s1, const char* const s2)
+{
+    char *dst = (char *)malloc(strlen(s1) + strlen(s2) + 1);
+    if (dst == NULL)
+    {
+      return NULL;
+    }
+    sprintf(dst, "%s%s", s1, s2);
+    return dst;
+}
+/*End Other*/
+
+
+/*MainThreads*/
+void *writeBitmap(void *vargp) 
+{ 
+	int *culine = (int *)vargp; 
+	if (save_watterfall_to_file (&watterfall, fftw.OUTPUT_FILE_TMP, *culine)) {
+				fprintf (stderr, "Error writing file.\n");
+	}
+	rename(fftw.OUTPUT_FILE_TMP, fftw.OUTPUT_FILE);
+    return NULL; 
+} 
+/*End MainThreads*/
+    
 int main (int argc, char *argv[])
 {
-	signal(SIGINT, intHandler);
+	signal(SIGINT, CtrlCHandler);
 
 	int c;
 	while ((c = getopt (argc, argv, "hd:r:i:a:x:w:m:o:v")) != -1)
@@ -468,6 +526,7 @@ int main (int argc, char *argv[])
 					break;
 			case 'o':
 					fftw.OUTPUT_FILE = optarg;
+					fftw.OUTPUT_FILE_TMP = my_strcat(fftw.OUTPUT_FILE,".tmp");
 					break;
 			case 'v':
 					VERBOSE = 1;
@@ -489,6 +548,7 @@ int main (int argc, char *argv[])
 		int s = ((watterfall.height*fftw.INTERVAL) -(3600*h)-(m*60));		
 		printf("total recording time on %ld lines is %d:%d:%d\n", watterfall.height,h,m,s);
 	}
+	
 
 	sound.BUFFER_SIZE = sound.SAMPLES_PER_TURN * 2 * 2;
 	sound.BUFFER = (char *)malloc(sound.BUFFER_SIZE);
@@ -501,18 +561,26 @@ int main (int argc, char *argv[])
 
 	bitmapInit();
 	
-	size_t actu_line_index=0;
+	
 	int WRITE_OUTPUT_INTERVAL_counter = fftw.WRITE_OUTPUT_INTERVAL;
 	
 	time_t now = time( NULL );
 	struct tm *now_tm;
+	struct timespec tp;
 	int hour,min,sec,last_maker_time;
 	
+	pthread_t writeBitmap_thread_id; 
+  
+	size_t actu_line_index=0;
 	while (keepRunning) { 
 	
 		bool CURRENTLINE_SET=1;
 		for (int a = 0; a < fftw.AVG; a++)
 		{
+			
+			clock_gettime(CLOCK_REALTIME, &tp);
+			unsigned long start_stop = tp.tv_sec * 1000000 + tp.tv_nsec/1000;
+			
 			audioRead();
 			
 			for (int i = 0; i < (int)sound.SAMPLES_PER_TURN; i++)
@@ -552,7 +620,11 @@ int main (int argc, char *argv[])
 			CURRENTLINE_SET=0;
 			
 			if(!keepRunning)break;
-			usleep((fftw.INTERVAL*1000000)/fftw.AVG);
+			
+			clock_gettime(CLOCK_REALTIME, &tp);
+			start_stop = ((fftw.INTERVAL*1000000)/fftw.AVG)-((tp.tv_sec * 1000000 + tp.tv_nsec/1000) - start_stop);
+			long_sleep(start_stop);
+			
 		}
 
 		int actu_pixel_index = watterfall.TEXT_OFFSET + (actu_line_index * watterfall.width);
@@ -577,15 +649,8 @@ int main (int argc, char *argv[])
 			
 			if(!(min % watterfall.TIMER_MARKER_INTERVAL) && (min != last_maker_time))
 			{
-				actu_pixel_index = (actu_line_index * watterfall.width);
-				for (int p = 0; p < watterfall.TEXT_OFFSET; p++)
-				{
-					watterfall.pixels[actu_pixel_index].red   = 0;
-					watterfall.pixels[actu_pixel_index].green = 255;
-					watterfall.pixels[actu_pixel_index].blue  = 0;	
-					actu_pixel_index++;				
-				}
-				draw_time(now,actu_line_index + 2);
+
+				draw_time(now,actu_line_index);
 				last_maker_time = min;
 			}
 
@@ -594,9 +659,7 @@ int main (int argc, char *argv[])
 		
 		WRITE_OUTPUT_INTERVAL_counter--;
 		if(WRITE_OUTPUT_INTERVAL_counter<1){
-			if (save_png_to_file (&watterfall, fftw.OUTPUT_FILE, actu_line_index)) {
-				fprintf (stderr, "Error writing file.\n");
-			}
+			pthread_create(&writeBitmap_thread_id, NULL, writeBitmap, (void *)&actu_line_index); 
 			WRITE_OUTPUT_INTERVAL_counter = fftw.WRITE_OUTPUT_INTERVAL;
 		}
 		
@@ -607,7 +670,6 @@ int main (int argc, char *argv[])
 	atexit(bitmapDeinit);
 	atexit(audioDeinit);
 	atexit(fftwDeinit);
-
 
 	exit (0);
 }
