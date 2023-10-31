@@ -275,7 +275,7 @@ typedef struct
 	int TIMER_MARKER_INTERVAL = 30;
 }
 bitmap_t;
-bitmap_t watterfall;
+bitmap_t waterfall;
 
 /* Given "bitmap", this returns the pixel of bitmap at the point 
    ("x", "y"). */
@@ -379,14 +379,14 @@ static int save_watterfall_to_file (bitmap_t *bitmap, const char *path, int offs
 
 void bitmapInit(void)
 {
-	watterfall.width = fftw.OUTLENGHT+watterfall.TEXT_OFFSET;
-	watterfall.pixels = (pixel_t *)calloc (watterfall.width * watterfall.height, sizeof (pixel_t));
-	memset(watterfall.pixels, 0, sizeof(pixel_t) * watterfall.width * watterfall.height);
+	waterfall.width = fftw.OUTLENGHT+waterfall.TEXT_OFFSET;
+	waterfall.pixels = (pixel_t *)calloc (waterfall.width * waterfall.height, sizeof (pixel_t));
+	memset(waterfall.pixels, 0, sizeof(pixel_t) * waterfall.width * waterfall.height);
 }
 
 void bitmapDeinit(void)
 {
-	free(watterfall.pixels);
+	free(waterfall.pixels);
 }
 
 void draw_time(time_t now,size_t linestart)
@@ -400,24 +400,24 @@ void draw_time(time_t now,size_t linestart)
 	time[3]=now_tm->tm_min/10;
 	time[4]=now_tm->tm_min-(time[3]*10);
 	
-	int actu_pixel_index = (linestart * watterfall.width);
-	for (int p = 0; p < watterfall.TEXT_OFFSET; p++)
+	int actu_pixel_index = (linestart * waterfall.width);
+	for (int p = 0; p < waterfall.TEXT_OFFSET; p++)
 	{
-		watterfall.pixels[actu_pixel_index].red = 0;
-		watterfall.pixels[actu_pixel_index].green = 255;
-		watterfall.pixels[actu_pixel_index].blue = 0;
+		waterfall.pixels[actu_pixel_index].red = 0;
+		waterfall.pixels[actu_pixel_index].green = 255;
+		waterfall.pixels[actu_pixel_index].blue = 0;
 		actu_pixel_index++;				
 	}
 	
-	int nline_to_delete = (watterfall.TIMER_MARKER_INTERVAL * 60) / fftw.INTERVAL;
+	int nline_to_delete = (waterfall.TIMER_MARKER_INTERVAL * 60) / fftw.INTERVAL;
 	
 	for (int x = 1; x < nline_to_delete; x++){
-		actu_pixel_index = ((linestart + x) * watterfall.width);
-		for (int p = 0; p < watterfall.TEXT_OFFSET; p++)
+		actu_pixel_index = (((int)linestart + x) > (int)waterfall.height) ? (x * waterfall.width) : ((linestart + x) * waterfall.width);
+		for (int p = 0; p < waterfall.TEXT_OFFSET; p++)
 		{
-			watterfall.pixels[actu_pixel_index].red = 0;
-			watterfall.pixels[actu_pixel_index].green = 0;
-			watterfall.pixels[actu_pixel_index].blue = 0;
+			waterfall.pixels[actu_pixel_index].red = 0;
+			waterfall.pixels[actu_pixel_index].green = 0;
+			waterfall.pixels[actu_pixel_index].blue = 0;
 			actu_pixel_index++;				
 		}
 	}
@@ -426,17 +426,17 @@ void draw_time(time_t now,size_t linestart)
 	for(int z=0;z<5;z++){
 		int line = linestart + 2;
 		for(int i=0;i<8;i++){
-			if(line>=(int)watterfall.height)line=0;
-			actu_pixel_index = line * watterfall.width + z * 10;
+			line = (line >= (int)waterfall.height) ? 0 : line;
+			actu_pixel_index = line * waterfall.width + z * 10;
 			for(int j=0;j<10;j++){
 				if(numbers[time[z]][j] & (1 << i)){
-					watterfall.pixels[actu_pixel_index].green = 255;
+					waterfall.pixels[actu_pixel_index].green = 255;
 				}
-				else{watterfall.pixels[actu_pixel_index].green = 0;}
+				else{waterfall.pixels[actu_pixel_index].green = 0;}
 				if(numbers[time[z]][j+10] & (1 << i)){
-					watterfall.pixels[actu_pixel_index+(8 * watterfall.width)].green = 255;
+					waterfall.pixels[actu_pixel_index+(8 * waterfall.width)].green = 255;
 				}
-				else{watterfall.pixels[actu_pixel_index+(8 * watterfall.width)].green = 0;}
+				else{waterfall.pixels[actu_pixel_index+(8 * waterfall.width)].green = 0;}
 				actu_pixel_index++;
 			}
 			line++;
@@ -480,7 +480,7 @@ char* my_strcat(const char* const s1, const char* const s2)
 void *writeBitmap(void *vargp) 
 { 
 	int *culine = (int *)vargp; 
-	if (save_watterfall_to_file (&watterfall, fftw.OUTPUT_FILE_TMP, *culine)) {
+	if (save_watterfall_to_file (&waterfall, fftw.OUTPUT_FILE_TMP, *culine)) {
 				fprintf (stderr, "Error writing file.\n");
 	}
 	rename(fftw.OUTPUT_FILE_TMP, fftw.OUTPUT_FILE);
@@ -522,7 +522,7 @@ int main (int argc, char *argv[])
 					sound.SAMPLES_PER_TURN = atoi(optarg);
 					break;
 			case 'm':
-					watterfall.TIMER_MARKER_INTERVAL = atoi(optarg);
+					waterfall.TIMER_MARKER_INTERVAL = atoi(optarg);
 					break;
 			case 'o':
 					fftw.OUTPUT_FILE = optarg;
@@ -536,17 +536,17 @@ int main (int argc, char *argv[])
 			}
 			
 	
-	if(watterfall.TIMER_MARKER_INTERVAL == 0)watterfall.TEXT_OFFSET=0;
-	else if(ceilf(((float)fftw.INTERVAL*10)/60) > watterfall.TIMER_MARKER_INTERVAL){watterfall.TIMER_MARKER_INTERVAL = ceilf(((float)fftw.INTERVAL*10)/60);}
+	if(waterfall.TIMER_MARKER_INTERVAL == 0)waterfall.TEXT_OFFSET=0;
+	else if(ceilf(((float)fftw.INTERVAL*10)/60) > waterfall.TIMER_MARKER_INTERVAL){waterfall.TIMER_MARKER_INTERVAL = ceilf(((float)fftw.INTERVAL*10)/60);}
 	
 	if(VERBOSE){
-		printf("Get a line all %ds, this mean minimal marker interval must be set to %.0fm, actualy is set to %dm\n", fftw.INTERVAL, ceilf(((float)fftw.INTERVAL*10)/60),watterfall.TIMER_MARKER_INTERVAL);
+		printf("Get a line all %ds, this mean minimal marker interval must be set to %.0fm, actualy is set to %dm\n", fftw.INTERVAL, ceilf(((float)fftw.INTERVAL*10)/60),waterfall.TIMER_MARKER_INTERVAL);
 		printf("With %d average means read audio and fft all %.2fs\n", fftw.AVG, (double)fftw.INTERVAL/(double)fftw.AVG);
 		printf("With %d intervall write output mean output all %ds\n", fftw.WRITE_OUTPUT_INTERVAL, fftw.WRITE_OUTPUT_INTERVAL*fftw.INTERVAL);
-		int h = ((watterfall.height*fftw.INTERVAL)/3600); 
-		int m = ((watterfall.height*fftw.INTERVAL) -(3600*h))/60;
-		int s = ((watterfall.height*fftw.INTERVAL) -(3600*h)-(m*60));		
-		printf("total recording time on %ld lines is %d:%d:%d\n", watterfall.height,h,m,s);
+		int h = ((waterfall.height*fftw.INTERVAL)/3600); 
+		int m = ((waterfall.height*fftw.INTERVAL) -(3600*h))/60;
+		int s = ((waterfall.height*fftw.INTERVAL) -(3600*h)-(m*60));		
+		printf("total recording time on %ld lines is %d:%d:%d\n", waterfall.height,h,m,s);
 	}
 	
 
@@ -627,27 +627,27 @@ int main (int argc, char *argv[])
 			
 		}
 
-		int actu_pixel_index = watterfall.TEXT_OFFSET + (actu_line_index * watterfall.width);
+		int actu_pixel_index = waterfall.TEXT_OFFSET + (actu_line_index * waterfall.width);
 
-		if(watterfall.TIMER_MARKER_INTERVAL){
-			watterfall.pixels[actu_pixel_index-1].green = 255;
+		if(waterfall.TIMER_MARKER_INTERVAL){
+			waterfall.pixels[actu_pixel_index-1].green = 255;
 		}
 	
 		for (int p = 0; p < fftw.OUTLENGHT; p++)
 		{
 			short index = fftw.CURRENTLINE[p] * 255;
-			watterfall.pixels[actu_pixel_index].red   = websdrWatterfall[index][0];
-			watterfall.pixels[actu_pixel_index].green = websdrWatterfall[index][1];
-			watterfall.pixels[actu_pixel_index].blue  = websdrWatterfall[index][2];
+			waterfall.pixels[actu_pixel_index].red   = websdrWatterfall[index][0];
+			waterfall.pixels[actu_pixel_index].green = websdrWatterfall[index][1];
+			waterfall.pixels[actu_pixel_index].blue  = websdrWatterfall[index][2];
 			actu_pixel_index++;
 		}
 
-		if(watterfall.TIMER_MARKER_INTERVAL){
+		if(waterfall.TIMER_MARKER_INTERVAL){
 			now = time(NULL);now_tm = localtime(&now);hour = now_tm->tm_hour;min = now_tm->tm_min;sec = now_tm->tm_sec;
-			if(VERBOSE)printf("the timestamp is %d:%d:%d print marker %d\n", hour,min,sec,(!(min % watterfall.TIMER_MARKER_INTERVAL) && (min != last_maker_time)));
+			if(VERBOSE)printf("the timestamp is %d:%d:%d print marker %d\n", hour,min,sec,(!(min % waterfall.TIMER_MARKER_INTERVAL) && (min != last_maker_time)));
 			
 			
-			if(!(min % watterfall.TIMER_MARKER_INTERVAL) && (min != last_maker_time))
+			if(!(min % waterfall.TIMER_MARKER_INTERVAL) && (min != last_maker_time))
 			{
 
 				draw_time(now,actu_line_index);
@@ -664,7 +664,7 @@ int main (int argc, char *argv[])
 		}
 		
 		actu_line_index++;
-		if(actu_line_index>=watterfall.height){actu_line_index=0;}
+		if(actu_line_index>=waterfall.height){actu_line_index=0;}
 	}
 
 	atexit(bitmapDeinit);
