@@ -412,7 +412,7 @@ void draw_time(time_t now,size_t linestart)
 	int nline_to_delete = (waterfall.TIMER_MARKER_INTERVAL * 60) / fftw.INTERVAL;
 	
 	for (int x = 1; x < nline_to_delete; x++){
-		actu_pixel_index = (((int)linestart + x) > (int)waterfall.height) ? (x * waterfall.width) : ((linestart + x) * waterfall.width);
+		actu_pixel_index = (((int)linestart + x) >= (int)waterfall.height) ? (x * waterfall.width) : ((linestart + x) * waterfall.width);
 		for (int p = 0; p < waterfall.TEXT_OFFSET; p++)
 		{
 			waterfall.pixels[actu_pixel_index].red = 0;
