@@ -14,6 +14,8 @@
 #include <string.h>
 
 #include <png.h>
+#include <zlib.h>
+
 #include <signal.h>
 #include <math.h>
 
@@ -353,6 +355,9 @@ static int save_watterfall_to_file (bitmap_t *bitmap, const char *path, int offs
     }
     
     /* Write the image data to "fp". */
+
+	png_set_compression_level(png_ptr, Z_NO_COMPRESSION);
+	png_set_filter (png_ptr,0,PNG_FILTER_NONE);
 
     png_init_io (png_ptr, fp);
     png_set_rows (png_ptr, info_ptr, row_pointers);
