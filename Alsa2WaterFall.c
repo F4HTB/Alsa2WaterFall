@@ -285,9 +285,7 @@ bitmap_t waterfall;
 
 static pixel_t * pixel_at (bitmap_t * bitmap, int x, int y)
 {
-	pthread_mutex_lock(&bitmap->save_waterfall_to_file_mutex);
     return bitmap->pixels + bitmap->width * y + x;
-	pthread_mutex_unlock(&bitmap->save_waterfall_to_file_mutex);
 }
 
 static int save_waterfall_to_file (bitmap_t *bitmap, const char *path, int offset_y = 0)
@@ -350,7 +348,9 @@ static int save_waterfall_to_file (bitmap_t *bitmap, const char *path, int offse
 		size_t actu_y = offset_y+y+1;
 		if(actu_y>bitmap->height)actu_y-=bitmap->height;
         for (x = 0; x < bitmap->width; x++) {
+			pthread_mutex_lock(&bitmap->save_waterfall_to_file_mutex);
             pixel_t * pixel = pixel_at (bitmap, x, actu_y);
+			pthread_mutex_unlock(&bitmap->save_waterfall_to_file_mutex);
             *row++ = pixel->red;
             *row++ = pixel->green;
             *row++ = pixel->blue;
