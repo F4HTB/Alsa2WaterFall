@@ -275,6 +275,7 @@ typedef struct
     size_t height = 14400; //24*60*10
 	int TEXT_OFFSET = 80;
 	int TIMER_MARKER_INTERVAL = 30;
+	pthread_mutex_t save_waterfall_to_file_mutex;
 }
 bitmap_t;
 bitmap_t waterfall;
@@ -284,10 +285,12 @@ bitmap_t waterfall;
 
 static pixel_t * pixel_at (bitmap_t * bitmap, int x, int y)
 {
+	pthread_mutex_lock(&bitmap->save_waterfall_to_file_mutex);
     return bitmap->pixels + bitmap->width * y + x;
+	pthread_mutex_unlock(&bitmap->save_waterfall_to_file_mutex);
 }
 
-static int save_watterfall_to_file (bitmap_t *bitmap, const char *path, int offset_y = 0)
+static int save_waterfall_to_file (bitmap_t *bitmap, const char *path, int offset_y = 0)
 {
     FILE * fp;
     png_structp png_ptr = NULL;
@@ -387,10 +390,12 @@ void bitmapInit(void)
 	waterfall.width = fftw.OUTLENGHT+waterfall.TEXT_OFFSET;
 	waterfall.pixels = (pixel_t *)calloc (waterfall.width * waterfall.height, sizeof (pixel_t));
 	memset(waterfall.pixels, 0, sizeof(pixel_t) * waterfall.width * waterfall.height);
+	pthread_mutex_init(&waterfall.save_waterfall_to_file_mutex, NULL);
 }
 
 void bitmapDeinit(void)
 {
+	pthread_mutex_destroy(&waterfall.save_waterfall_to_file_mutex);
 	free(waterfall.pixels);
 }
 
@@ -485,7 +490,7 @@ char* my_strcat(const char* const s1, const char* const s2)
 void *writeBitmap(void *vargp) 
 { 
 	int *culine = (int *)vargp; 
-	if (save_watterfall_to_file (&waterfall, fftw.OUTPUT_FILE_TMP, *culine)) {
+	if (save_waterfall_to_file (&waterfall, fftw.OUTPUT_FILE_TMP, *culine)) {
 				fprintf (stderr, "Error writing file.\n");
 	}
 	rename(fftw.OUTPUT_FILE_TMP, fftw.OUTPUT_FILE);
@@ -634,6 +639,8 @@ int main (int argc, char *argv[])
 
 		int actu_pixel_index = waterfall.TEXT_OFFSET + (actu_line_index * waterfall.width);
 
+		pthread_mutex_lock(&waterfall.save_waterfall_to_file_mutex);
+
 		if(waterfall.TIMER_MARKER_INTERVAL){
 			waterfall.pixels[actu_pixel_index-1].green = 255;
 		}
@@ -641,9 +648,9 @@ int main (int argc, char *argv[])
 		for (int p = 0; p < fftw.OUTLENGHT; p++)
 		{
 			short index = fftw.CURRENTLINE[p] * 255;
-			waterfall.pixels[actu_pixel_index].red   = websdrWatterfall[index][0];
-			waterfall.pixels[actu_pixel_index].green = websdrWatterfall[index][1];
-			waterfall.pixels[actu_pixel_index].blue  = websdrWatterfall[index][2];
+			waterfall.pixels[actu_pixel_index].red   = websdrWaterfall[index][0];
+			waterfall.pixels[actu_pixel_index].green = websdrWaterfall[index][1];
+			waterfall.pixels[actu_pixel_index].blue  = websdrWaterfall[index][2];
 			actu_pixel_index++;
 		}
 
@@ -661,6 +668,7 @@ int main (int argc, char *argv[])
 
 		}
 
+		pthread_mutex_unlock(&waterfall.save_waterfall_to_file_mutex);
 		
 		WRITE_OUTPUT_INTERVAL_counter--;
 		if(WRITE_OUTPUT_INTERVAL_counter<1){
